@@ -27,10 +27,13 @@ def rmse(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     return float(np.sqrt(np.mean((y_true - y_pred) ** 2)))
 
 
+_MIN_RANGE = 1e-6  # minimum P95-P5 range to compute NRMSE
+
+
 def nrmse(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     """RMSE normalised by the P95-P5 range of the ground-truth."""
     rng = np.percentile(y_true, 95) - np.percentile(y_true, 5)
-    if rng < 1e-6:
+    if rng < _MIN_RANGE:
         return float("nan")
     return rmse(y_true, y_pred) / rng
 

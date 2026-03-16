@@ -51,7 +51,7 @@ def label_states(
     centroids : np.ndarray of shape (n_states,)
         Mean power for each state (sorted ascending).
     """
-    values = series.fillna(0).values.astype(float)
+    values = series.fillna(0).values.astype(float)  # NaN → 0 = treated as OFF
     labels = np.zeros(len(values), dtype=int)
 
     on_mask = values > on_threshold

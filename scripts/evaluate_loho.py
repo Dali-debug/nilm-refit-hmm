@@ -34,7 +34,6 @@ from src.hmm_model import load_model
 from src.inference import disaggregate
 from src.load_refit import load_config
 from src.metrics import compute_all_metrics, metrics_table
-from src.states import label_states
 
 logging.basicConfig(
     level=logging.INFO,

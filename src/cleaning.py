@@ -54,7 +54,6 @@ def clean_resample(
 
     # ── 1. Negative → NaN ────────────────────────────────────────────────────
     neg_counts = (df < 0).sum()
-    df = df.clip(lower=0)
     df = df.where(df >= 0, other=np.nan)
     stats["neg_replaced"] = neg_counts.to_dict()
 

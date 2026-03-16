@@ -18,6 +18,8 @@ def make_synthetic_house(
     Columns: mains, kettle, microwave, fridge, washing_machine
     """
     rng = np.random.default_rng(seed)
+    # REFIT dataset is from UK houses – use Europe/London to match io_refit.py convention.
+    # Requires the 'tzdata' package (or system timezone data) in the test environment.
     index = pd.date_range(start=start, periods=n_minutes, freq="1min", tz="Europe/London")
 
     # Fridge: cyclic ~200W on, ~0W off, 20-min on / 10-min off

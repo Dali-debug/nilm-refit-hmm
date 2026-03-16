@@ -1,0 +1,31 @@
+# Dataset (not committed due to size)
+data/raw/*.csv
+data/raw/*.CSV
+data/processed/
+# Models and results
+models/
+results/
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+# Notebooks
+.ipynb_checkpoints/
+# Environments
+.env
+.venv
+venv/
+env/
+# IDE
+.idea/
+.vscode/
+*.swp
+# OS
+.DS_Store
+Thumbs.db
+# Pytest cache
+.pytest_cache/

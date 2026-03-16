@@ -1,0 +1,99 @@
+# NILM REFIT HMM — default configuration
+# 5-house LOHO cross-house experiment
+
+# ── Data paths ──────────────────────────────────────────────────
+data:
+  raw_dir: data/raw          # Raw REFIT CSVs:  House_<N>.csv
+  processed_dir: data/processed/1min   # Output: house_<N>.csv (CSV, no parquet)
+
+# ── Houses used (Leave-One-House-Out) ───────────────────────────
+houses: [2, 3, 4, 5, 8]
+
+# ── Resampling ──────────────────────────────────────────────────
+resample_freq: "1min"        # 1-minute bins (pandas >= 2.0 alias)
+
+# ── Cleaning thresholds ─────────────────────────────────────────
+cleaning:
+  neg_to_nan: true           # Replace negative power with NaN
+  outlier_quantile: 0.999    # Values > quantile * 1.5 → NaN
+  interp_method: time        # pandas interpolation method
+  interp_limit: 5            # Max consecutive missing minutes to interpolate
+  max_missing_ratio: 0.10    # Drop house/appliance if > 10 % still missing
+
+# ── Appliance definitions ────────────────────────────────────────
+# on_threshold: minimum power (W) to consider appliance ON
+# n_states:     number of HMM states (1 = OFF + rest)
+appliances:
+  kettle:
+    on_threshold: 1000
+    n_states: 2
+    order: 1            # greedy subtraction order (1 = first)
+  microwave:
+    on_threshold: 700
+    n_states: 2
+    order: 2
+  fridge:
+    on_threshold: 50
+    n_states: 3
+    order: 3
+  television:
+    on_threshold: 30
+    n_states: 2
+    order: 4
+  washing_machine:
+    on_threshold: 20
+    n_states: 5
+    order: 5
+
+# ── Channel mapping per house ────────────────────────────────────
+# REFIT CSV columns: Time, Aggregate, Appliance1, ..., Appliance9
+# Channels are 1-indexed (column index in the CSV after "Time")
+house_channels:
+  2:
+    aggregate: 0
+    fridge: 1
+    washing_machine: 2
+    television: 4
+    microwave: 5
+    kettle: 8
+  3:
+    aggregate: 0
+    fridge: 2
+    washing_machine: 6
+    television: 7
+    microwave: 8
+    kettle: 9
+  4:
+    aggregate: 0
+    fridge: 1
+    washing_machine: 4
+    television: 7
+    microwave: 8
+    kettle: 9
+  5:
+    aggregate: 0
+    fridge: 1
+    washing_machine: 3
+    television: 6
+    microwave: 7
+    kettle: 8
+  8:
+    aggregate: 0
+    fridge: 1
+    washing_machine: 4
+    television: 7
+    microwave: 8
+    kettle: 9
+
+# ── HMM training ────────────────────────────────────────────────
+hmm:
+  covariance_type: full      # GaussianHMM covariance type
+  n_iter: 100                # EM iterations
+  tol: 1e-4                  # Convergence tolerance
+  random_state: 42
+
+# ── Evaluation ──────────────────────────────────────────────────
+evaluation:
+  energy_epsilon: 1e-3       # Avoid division by zero in REE
+  models_dir: models         # Saved HMM pickle files
+  results_dir: results       # KPI CSV/JSON outputs

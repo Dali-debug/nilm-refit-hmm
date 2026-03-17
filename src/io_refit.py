@@ -70,7 +70,23 @@ def load_house(
     else:
         # Localise / convert
         if df["Time"].dt.tz is None:
-            df["Time"] = df["Time"].dt.tz_localize(tz, ambiguous="infer", nonexistent="shift_forward")
+            try:
+                df["Time"] = df["Time"].dt.tz_localize(
+                    tz,
+                    ambiguous="infer",
+                    nonexistent="shift_forward",
+                )
+            except Exception as exc:
+                # Some REFIT files contain DST-fallback duplicates that cannot
+                # be inferred safely from local wall-clock timestamps.
+                if exc.__class__.__name__ == "AmbiguousTimeError" and "Unix" in df.columns:
+                    logger.warning(
+                        "Ambiguous local timestamps for House %d; falling back to Unix epoch column.",
+                        house_id,
+                    )
+                    df["Time"] = pd.to_datetime(df["Unix"], unit="s", utc=True).dt.tz_convert(tz)
+                else:
+                    raise
         else:
             df["Time"] = df["Time"].dt.tz_convert(tz)
 

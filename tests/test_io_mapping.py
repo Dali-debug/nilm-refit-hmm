@@ -32,6 +32,38 @@ def make_synthetic_csv(house_id: int, tmp_dir: Path, n_rows: int = 100) -> Path:
     return csv_path
 
 
+def make_dst_ambiguous_csv(house_id: int, tmp_dir: Path) -> Path:
+    """
+    Create a REFIT-format CSV whose Time column spans the UK DST fall-back
+    (2014-10-26 01:00 local time occurs twice), making tz_localize('infer')
+    raise an AmbiguousTimeError / ValueError.  The Unix column is unambiguous.
+    """
+    # Build a sequence of UTC timestamps around the DST boundary.
+    # UK clocks fall back from BST→GMT at 01:00 BST (= 00:00 UTC) on
+    # 2014-10-26, so wall-clock 01:00–01:59 Europe/London repeats when
+    # localised from naive strings.  Unix column remains unambiguous.
+    start_utc = pd.Timestamp("2014-10-26 00:50:00", tz="UTC")
+    utc_times = pd.date_range(start_utc, periods=30, freq="1min", tz="UTC")
+
+    # Wall-clock (naive) strings – these are intentionally ambiguous
+    local_strings = utc_times.tz_convert("Europe/London").strftime("%Y-%m-%d %H:%M:%S")
+    unix_vals = utc_times.astype("int64") // 10 ** 9  # seconds since epoch
+
+    rng = np.random.default_rng(house_id)
+    data = {
+        "Time": local_strings,
+        "Unix": unix_vals,
+        "Aggregate": rng.uniform(100, 3000, len(utc_times)),
+    }
+    for i in range(1, 10):
+        data[f"Appliance{i}"] = rng.uniform(0, 500, len(utc_times))
+
+    df = pd.DataFrame(data)
+    csv_path = tmp_dir / f"House_{house_id}.csv"
+    df.to_csv(csv_path, index=False)
+    return csv_path
+
+
 class TestIORefit:
     def test_load_house(self):
         from src.io_refit import load_house
@@ -65,6 +97,46 @@ class TestIORefit:
             df.to_csv(csv_path, index=False)
             loaded = load_house(2, raw_dir=str(tmp_path))
             assert loaded.index.is_unique
+
+    def test_dst_ambiguity_fallback_to_unix(self):
+        """
+        When Time column contains DST-ambiguous wall-clock strings that
+        tz_localize cannot infer, load_house must fall back to the Unix
+        column and succeed (no exception raised).
+        """
+        from src.io_refit import load_house
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            make_dst_ambiguous_csv(2, tmp_path)
+            # Should NOT raise — automatic fallback to Unix expected
+            df = load_house(2, raw_dir=str(tmp_path), tz="Europe/London")
+            assert len(df) > 0
+            assert df.index.tz is not None
+            assert df.index.is_unique
+
+    def test_prefer_unix_time_skips_localize(self):
+        """
+        With prefer_unix_time=True the function must not attempt tz_localize
+        and must produce a valid tz-aware index regardless of Time column content.
+        """
+        from src.io_refit import load_house
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            # Even a file with DST-ambiguous Time strings must succeed.
+            make_dst_ambiguous_csv(2, tmp_path)
+            df = load_house(2, raw_dir=str(tmp_path), prefer_unix_time=True)
+            assert len(df) > 0
+            assert df.index.tz is not None
+
+    def test_prefer_unix_time_normal_file(self):
+        """prefer_unix_time=True works on an ordinary (non-ambiguous) CSV."""
+        from src.io_refit import load_house
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            make_synthetic_csv(2, tmp_path, n_rows=50)
+            df = load_house(2, raw_dir=str(tmp_path), prefer_unix_time=True)
+            assert len(df) == 50
+            assert df.index.tz is not None
 
 
 class TestMapping:

@@ -48,6 +48,11 @@ POWER_CAP = {
 # ── Reproducibility ───────────────────────────────────────────────────────────
 RANDOM_SEED = 42
 
+# ── Timestamp handling ────────────────────────────────────────────────────────
+# Set to True to always derive the index from the Unix epoch column,
+# sidestepping DST wall-clock ambiguity for REFIT data.
+PREFER_UNIX_TIME = False
+
 # ── Paths (relative to project root) ─────────────────────────────────────────
 RAW_DATA_DIR       = "data/raw"
 PROCESSED_DATA_DIR = "data/processed/1min"

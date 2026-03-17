@@ -21,7 +21,7 @@ import pandas as pd
 # Ensure src/ is importable when running from project root
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.config import FULL_HOUSES, DEV_HOUSES, PROCESSED_DATA_DIR, RAW_DATA_DIR
+from src.config import FULL_HOUSES, DEV_HOUSES, PROCESSED_DATA_DIR, RAW_DATA_DIR, PREFER_UNIX_TIME
 from src.io_refit import load_house
 from src.mapping import standardize, HOUSE_MAP
 from src.cleaning import clean_resample
@@ -37,6 +37,8 @@ def parse_args():
                    help="House IDs to process.  Defaults to FULL_HOUSES.")
     p.add_argument("--dev", action="store_true",
                    help="Use DEV_HOUSES subset.")
+    p.add_argument("--prefer-unix-time", action="store_true", default=PREFER_UNIX_TIME,
+                   help="Derive timestamps from Unix epoch column, avoiding DST ambiguity.")
     p.add_argument("--raw-dir", default=RAW_DATA_DIR)
     p.add_argument("--out-dir", default=PROCESSED_DATA_DIR)
     return p.parse_args()
@@ -66,7 +68,7 @@ def main():
             continue
         try:
             logger.info("=== House %d ===", hid)
-            raw = load_house(hid, raw_dir=str(raw_dir))
+            raw = load_house(hid, raw_dir=str(raw_dir), prefer_unix_time=args.prefer_unix_time)
             std = standardize(raw, hid, appliances=TARGET_APPLIANCES)
             clean, stats = clean_resample(std, report=True)
 

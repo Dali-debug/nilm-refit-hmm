@@ -17,6 +17,7 @@ def load_house(
     house_id: int,
     raw_dir: str = "data/raw",
     tz: str = "Europe/London",
+    prefer_unix_time: bool = False,
 ) -> pd.DataFrame:
     """
     Load a single REFIT house CSV and return a timezone-aware DataFrame
@@ -30,6 +31,11 @@ def load_house(
         Directory containing House_*.csv files.
     tz : str
         Timezone for the timestamps.
+    prefer_unix_time : bool
+        If True, always derive the index from the ``Unix`` epoch column,
+        bypassing ``Time`` string parsing entirely.  This sidesteps DST
+        ambiguity and is recommended for REFIT data spanning DST transitions.
+        Default is False (use ``Time`` with automatic fallback to ``Unix``).
 
     Returns
     -------
@@ -63,10 +69,19 @@ def load_house(
     # Rename first two columns robustly
     df.columns = [c.strip() for c in df.columns]
 
-    # Parse Unix column as fallback datetime if Time failed
-    if not pd.api.types.is_datetime64_any_dtype(df["Time"]):
-        logger.warning("Time column parse failed; falling back to Unix column.")
-        df["Time"] = pd.to_datetime(df["Unix"], unit="s", utc=True).dt.tz_convert(tz)
+    def _time_from_unix() -> pd.Series:
+        return pd.to_datetime(df["Unix"], unit="s", utc=True).dt.tz_convert(tz)
+
+    if prefer_unix_time and "Unix" in df.columns:
+        # Caller has explicitly requested Unix-epoch-based timestamps.
+        logger.info("House %d: using Unix epoch column (prefer_unix_time=True).", house_id)
+        df["Time"] = _time_from_unix()
+    elif not pd.api.types.is_datetime64_any_dtype(df["Time"]):
+        # Time column could not be parsed at all; fall back to Unix.
+        logger.warning(
+            "House %d: Time column parse failed; falling back to Unix column.", house_id
+        )
+        df["Time"] = _time_from_unix()
     else:
         # Localise / convert
         if df["Time"].dt.tz is None:
@@ -79,12 +94,28 @@ def load_house(
             except Exception as exc:
                 # Some REFIT files contain DST-fallback duplicates that cannot
                 # be inferred safely from local wall-clock timestamps.
-                if exc.__class__.__name__ == "AmbiguousTimeError" and "Unix" in df.columns:
+                # pandas may raise AmbiguousTimeError (a ValueError subclass) or
+                # a plain ValueError whose message mentions "ambiguous" or
+                # "nonexistent" — check both forms so that all pandas versions
+                # (and pytz/zoneinfo backends) are handled correctly.
+                exc_name = exc.__class__.__name__
+                exc_msg = str(exc).lower()
+                is_dst_error = exc_name in (
+                    "AmbiguousTimeError",
+                    "NonExistentTimeError",
+                ) or (
+                    isinstance(exc, ValueError)
+                    and any(kw in exc_msg for kw in ("ambiguous", "nonexistent"))
+                )
+                if is_dst_error and "Unix" in df.columns:
                     logger.warning(
-                        "Ambiguous local timestamps for House %d; falling back to Unix epoch column.",
+                        "House %d: DST error during tz_localize (%s: %s). "
+                        "Falling back to Unix epoch column.",
                         house_id,
+                        exc_name,
+                        exc,
                     )
-                    df["Time"] = pd.to_datetime(df["Unix"], unit="s", utc=True).dt.tz_convert(tz)
+                    df["Time"] = _time_from_unix()
                 else:
                     raise
         else:
